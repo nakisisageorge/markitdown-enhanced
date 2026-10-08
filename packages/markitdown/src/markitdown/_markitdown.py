@@ -173,6 +173,11 @@ class MarkItDown:
         self._llm_prompt: Union[str | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
+        # LLM enhancement features
+        self._llm_enhancement_enabled: bool = False
+        self._llm_summarization_enabled: bool = False
+        self._llm_analysis_enabled: bool = False
+        self._llm_translation_enabled: Union[str, None] = None
 
         # Register the converters
         self._converters: List[ConverterRegistration] = []
@@ -198,6 +203,11 @@ class MarkItDown:
             self._llm_prompt = kwargs.get("llm_prompt")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
+            # LLM enhancement features
+            self._llm_enhancement_enabled = kwargs.get("llm_enhancement_enabled", False)
+            self._llm_summarization_enabled = kwargs.get("llm_summarization_enabled", False)
+            self._llm_analysis_enabled = kwargs.get("llm_analysis_enabled", False)
+            self._llm_translation_enabled = kwargs.get("llm_translation_enabled")
 
             if self._exiftool_path is None:
                 self._exiftool_path = os.getenv("EXIFTOOL_PATH")
@@ -845,3 +855,176 @@ class MarkItDown:
             return codecs.lookup(charset).name
         except LookupError:
             return charset
+
+    def enhance_markdown(self, markdown_text: str, *, client=None, model=None, prompt=None) -> str:
+        """
+        Enhance markdown text using an LLM to improve quality, formatting, and readability.
+        
+        Args:
+            markdown_text: The markdown text to enhance
+            client: Optional LLM client (uses self._llm_client if not provided)
+            model: Optional LLM model (uses self._llm_model if not provided)
+            prompt: Optional prompt to guide enhancement (uses default if not provided)
+            
+        Returns:
+            Enhanced markdown text
+        """
+        if not self._llm_enhancement_enabled:
+            return markdown_text
+            
+        llm_client = client or self._llm_client
+        llm_model = model or self._llm_model
+        enhancement_prompt = prompt or "Improve the quality, formatting, and readability of this markdown text while preserving all important information:"
+        
+        if not llm_client or not llm_model:
+            return markdown_text
+            
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": enhancement_prompt},
+                        {"type": "text", "text": markdown_text},
+                    ],
+                }
+            ]
+            
+            response = llm_client.chat.completions.create(model=llm_model, messages=messages)
+            return response.choices[0].message.content
+        except Exception:
+            # If enhancement fails, return original text
+            return markdown_text
+
+    def summarize(self, markdown_text: str, *, client=None, model=None, prompt=None, max_length=None) -> str:
+        """
+        Create a summary of the markdown text using an LLM.
+        
+        Args:
+            markdown_text: The markdown text to summarize
+            client: Optional LLM client (uses self._llm_client if not provided)
+            model: Optional LLM model (uses self._llm_model if not provided)
+            prompt: Optional prompt to guide summarization (uses default if not provided)
+            max_length: Optional maximum length for summary
+            
+        Returns:
+            Summarized text
+        """
+        if not self._llm_summarization_enabled:
+            return markdown_text
+            
+        llm_client = client or self._llm_client
+        llm_model = model or self._llm_model
+        summary_prompt = prompt or f"Create a concise summary of the following markdown text:"
+        if max_length:
+            summary_prompt += f" Limit the summary to approximately {max_length} characters."
+        
+        if not llm_client or not llm_model:
+            return markdown_text
+            
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": summary_prompt},
+                        {"type": "text", "text": markdown_text},
+                    ],
+                }
+            ]
+            
+            response = llm_client.chat.completions.create(model=llm_model, messages=messages)
+            return response.choices[0].message.content
+        except Exception:
+            # If summarization fails, return original text
+            return markdown_text
+
+    def analyze_content(self, markdown_text: str, *, client=None, model=None, prompt=None) -> dict:
+        """
+        Analyze markdown content to extract entities, sentiment, topics, etc.
+        
+        Args:
+            markdown_text: The markdown text to analyze
+            client: Optional LLM client (uses self._llm_client if not provided)
+            model: Optional LLM model (uses self._llm_model if not provided)
+            prompt: Optional prompt to guide analysis (uses default if not provided)
+            
+        Returns:
+            Dictionary containing analysis results
+        """
+        if not self._llm_analysis_enabled:
+            return {}
+            
+        llm_client = client or self._llm_client
+        llm_model = model or self._llm_model
+        analysis_prompt = prompt or "Analyze this markdown text and extract: 1) Key entities (people, organizations, locations), 2) Sentiment (positive/negative/neutral), 3) Main topics/themes, 4) Important facts or claims:"
+        
+        if not llm_client or not llm_model:
+            return {}
+            
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": analysis_prompt},
+                        {"type": "text", "text": markdown_text},
+                    ],
+                }
+            ]
+            
+            response = llm_client.chat.completions.create(model=llm_model, messages=messages)
+            # Try to parse as JSON, fallback to text if needed
+            import json
+            try:
+                return json.loads(response.choices[0].message.content)
+            except json.JSONDecodeError:
+                return {"analysis": response.choices[0].message.content}
+        except Exception:
+            # If analysis fails, return empty dict
+            return {}
+
+    def translate(self, markdown_text: str, *, client=None, model=None, target_language=None, prompt=None) -> str:
+        """
+        Translate markdown text to another language using an LLM.
+        
+        Args:
+            markdown_text: The markdown text to translate
+            client: Optional LLM client (uses self._llm_client if not provided)
+            model: Optional LLM model (uses self._llm_model if not provided)
+            target_language: Target language code (uses self._llm_translation_enabled if not provided)
+            prompt: Optional prompt to guide translation (uses default if not provided)
+            
+        Returns:
+            Translated markdown text
+        """
+        if not self._llm_translation_enabled and not target_language:
+            return markdown_text
+            
+        llm_client = client or self._llm_client
+        llm_model = model or self._llm_model
+        lang = target_language or self._llm_translation_enabled
+        if not lang:
+            return markdown_text
+            
+        translation_prompt = prompt or f"Translate the following markdown text to {lang}. Preserve markdown formatting and structure:"
+        
+        if not llm_client or not llm_model:
+            return markdown_text
+            
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": translation_prompt},
+                        {"type": "text", "text": markdown_text},
+                    ],
+                }
+            ]
+            
+            response = llm_client.chat.completions.create(model=llm_model, messages=messages)
+            return response.choices[0].message.content
+        except Exception:
+            # If translation fails, return original text
+            return markdown_text

@@ -297,6 +297,76 @@ print(result.markdown)
 
 If any attempt succeeds, image conversion continues normally. If the client raises an error after exhausting its retries, or encounters a non-retryable error, MarkItDown tries other applicable converters and raises `FileConversionException` only if none succeeds.
 
+### LLM Enhancement Features
+
+MarkItDown includes optional LLM-powered enhancement features that can improve the quality of converted markdown, generate summaries, analyze content, and translate text. These features are disabled by default and require an LLM client to be provided.
+
+#### Enabling LLM Enhancement Features
+
+To use the LLM enhancement features, you need to:
+1. Provide an LLM client (e.g., OpenAI client)
+2. Enable the specific features you want to use
+3. Optionally specify an LLM model
+
+```python
+from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(
+    llm_client=client,
+    llm_model="gpt-4o",
+    llm_enhancement_enabled=True,      # Enable markdown enhancement
+    llm_summarization_enabled=True,    # Enable summarization
+    llm_analysis_enabled=True,         # Enable content analysis
+    llm_translation_enabled="es"       # Enable translation to Spanish
+)
+```
+
+#### Markdown Enhancement
+
+The `enhance_markdown()` method uses an LLM to improve the quality, formatting, and readability of converted markdown while preserving all important information:
+
+```python
+# After converting a document
+result = md.convert("document.pdf")
+enhanced_markdown = md.enhance_markdown(result.text_content)
+```
+
+#### Summarization
+
+The `summarize()` method creates concise summaries of converted markdown:
+
+```python
+# After converting a document
+result = md.convert("long_document.pdf")
+summary = md.summarize(result.text_content, max_length=200)
+```
+
+#### Content Analysis
+
+The `analyze_content()` method extracts entities, sentiment, topics, and other insights from markdown:
+
+```python
+# After converting a document
+result = md.convert("report.pdf")
+analysis = md.analyze_content(result.text_content)
+# Returns a dictionary with keys like: entities, sentiment, topics, facts
+```
+
+#### Translation
+
+The `translate()` method translates markdown text to other languages:
+
+```python
+# After converting a document
+result = md.convert("document.pdf")
+spanish_markdown = md.translate(result.text_content, target_language="es")
+# Or use the pre-configured target language:
+md_spanish = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_translation_enabled="es")
+spanish_markdown = md_spanish.translate(result.text_content)
+```
+
 ### Docker
 
 ```sh
